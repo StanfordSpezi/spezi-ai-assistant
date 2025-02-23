@@ -26,7 +26,7 @@ export const Overview = () => {
           >
             Stanford Spezi
           </Link>{' '}
-          framework. It provides guidance on using Spezi's modular components and best practices.
+          framework. It provides guidance on using Spezi&apos;s modular components and best practices.
         </p>
         <p>
           You can learn more about Stanford Spezi at our{' '}
