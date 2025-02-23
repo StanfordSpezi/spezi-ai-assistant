@@ -16,7 +16,7 @@
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
-    "generate-embeddings": "tsx scripts/generate-embeddings.ts"
+    "ingest-markdown": "tsx scripts/ingest-markdown.ts"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.8",

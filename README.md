@@ -1,28 +1,73 @@
-<a href="https://spezigpt.com/">
-  <h1 align="center">Spezi AI Assistant</h1>
-</a>
+# Spezi AI Assistant
 
-<p align="center">
-  An AI Assistant for the <a href="https://spezi.stanford.edu/">Stanford Spezi</a> framework.
-</p>
+A friendly code assistant that helps users with their questions about the <a href="https://spezi.stanford.edu/">Stanford Spezi</a> framework.
 
 ## Features
 
 - [Next.js](https://nextjs.org)
 - [AI SDK](https://sdk.vercel.ai/docs)
 - [shadcn/ui](https://ui.shadcn.com)
-- Data Persistence with [Vercel Postgres](https://vercel.com/storage/postgres) and [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
+- [LangChain](https://www.langchain.com/)
+- Data Persistence with [Vercel Postgres](https://vercel.com/storage/postgres) and [Vercel Blob](https://vercel.com/storage/blob)
 - [NextAuth.js](https://github.com/nextauthjs/next-auth) for authentication
 
-## Running locally
+## Local Development
 
 You will need to update the environment variables [see the example file in `.env.example`](.env.example) to run the Spezi AI Assistant.
 
 > Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
 
+### Database Setup
+
+1. Set up your Postgres database (either locally or using Vercel Postgres)
+
+2. Add your database URL to the `.env` file:
+
+   ```
+   POSTGRES_URL="postgres://..."
+   ```
+
+3. Initialize the database:
+
+   ```bash
+   # Generate the database schema
+   pnpm db:generate
+
+   # Push the schema to your database
+   pnpm db:push
+
+   # Optional: Open the database UI
+   pnpm db:studio
+   ```
+
+### Ingesting Documentation
+
+To ingest markdown documentation and code files:
+
+1. Place your markdown files in the `resources` directory
+
+2. Run the ingestion script:
+
+   ```bash
+   pnpm ingest-markdown
+   ```
+
+The script will:
+- Process all markdown and code files
+- Split them into meaningful chunks
+- Generate embeddings using OpenAI's embedding model
+- Store the embeddings in your Postgres database
+
+You can customize the chunk size and overlap in `scripts/ingest-markdown.ts`.
+
+### Install dependencies
+
 ```bash
 pnpm install
-pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000/).
+### Run the development server
+
+```bash
+pnpm run dev
+```
