@@ -25,6 +25,9 @@ import { createDocument } from '@/lib/ai/tools/create-document';
 import { updateDocument } from '@/lib/ai/tools/update-document';
 import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
+import { findRelevantContent } from '@/lib/ai/embedding';
+import { tool } from 'ai';
+import { z } from 'zod';
 
 export const maxDuration = 60;
 
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
                 'createDocument',
                 'updateDocument',
                 'requestSuggestions',
+                'getKnowledgeBase',
               ],
         experimental_transform: smoothStream({ chunking: 'word' }),
         experimental_generateMessageId: generateUUID,
@@ -84,6 +88,15 @@ export async function POST(request: Request) {
           requestSuggestions: requestSuggestions({
             session,
             dataStream,
+          }),
+          getKnowledgeBase: tool({
+            description: 'Get information from the knowledge base to answer questions',
+            parameters: z.object({
+              query: z.string().describe('the search query or question to look up'),
+            }),
+            execute: async ({ query }) => {
+              return findRelevantContent(query);
+            }
           }),
         },
         onFinish: async ({ response, reasoning }) => {

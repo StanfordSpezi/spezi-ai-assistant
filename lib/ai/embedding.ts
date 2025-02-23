@@ -44,8 +44,7 @@ export const findRelevantContent = async (userQuery: string) => {
   const similarGuides = await db
     .select({ 
       content: embeddings.content, 
-      similarity,
-      url: resources.id 
+      similarity
     })
     .from(embeddings)
     .leftJoin(resources, eq(embeddings.resourceId, resources.id))
