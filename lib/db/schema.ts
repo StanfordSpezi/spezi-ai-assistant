@@ -10,6 +10,7 @@ import {
   foreignKey,
   boolean,
 } from 'drizzle-orm/pg-core';
+import { nanoid } from 'nanoid';
 
 export const user = pgTable('User', {
   id: uuid('id').primaryKey().notNull().defaultRandom(),
@@ -113,3 +114,14 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+export const resources = pgTable('resources', {
+  id: varchar('id', { length: 191 })
+    .primaryKey()
+    .$defaultFn(() => nanoid()),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export type Resources = InferSelectModel<typeof resources>;
