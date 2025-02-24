@@ -2,7 +2,7 @@ import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
 import { openai } from '@ai-sdk/openai';
 import { db } from '../lib/db';
-import { embeddings } from '../lib/db/schema';
+import { embeddings, resources } from '../lib/db/schema';
 import { embedMany } from 'ai';
 import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 
@@ -52,8 +52,17 @@ const generateEmbeddings = async (
 
 async function processMarkdownFile(filePath: string) {
   try {
+    console.log(`Processing ${filePath}`);
     // Read the markdown file
     const content = await readFile(filePath, 'utf-8');
+
+    // First create a resource entry for the file
+    const fileName = filePath.split('/').pop() || '';
+    const [resource] = await db.insert(resources).values({
+      url: filePath,
+      title: fileName.replace(/\.[^/.]+$/, ''),
+      content: content
+    }).returning();
     
     // Generate embeddings for the content
     const contentEmbeddings = await generateEmbeddings(content);
@@ -62,10 +71,10 @@ async function processMarkdownFile(filePath: string) {
     for (const { embedding, content } of contentEmbeddings) {
       await db.insert(embeddings).values({
         embedding,
-        content
+        content,
+        resourceId: resource.id
       });
     }
-    
     console.log(`Successfully processed ${filePath}`);
   } catch (error) {
     console.error(`Error processing ${filePath}:`, error);

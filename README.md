@@ -49,7 +49,7 @@ To ingest markdown documentation and code files:
 2. Run the ingestion script:
 
    ```bash
-   pnpm ingest-markdown
+   pnpm ingest
    ```
 
 The script will:

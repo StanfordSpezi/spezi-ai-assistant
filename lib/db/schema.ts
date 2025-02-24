@@ -122,6 +122,8 @@ export const resources = pgTable('resources', {
     .primaryKey()
     .$defaultFn(() => nanoid()),
   content: text('content').notNull(),
+  url: text('url').notNull(),
+  title: text('title').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
