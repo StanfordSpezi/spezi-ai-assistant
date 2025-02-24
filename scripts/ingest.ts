@@ -17,11 +17,17 @@ const execAsync = promisify(exec);
 
 const embeddingModel = openai.embedding('text-embedding-ada-002');
 
-async function loadRepositories(): Promise<string[]> {
+type Repository = {
+  filename: string;
+  url: string;
+  title: string;
+};
+
+async function loadRepositories(): Promise<Repository[]> {
   try {
     const configPath = join(process.cwd(), 'config', 'repositories.yml');
     const fileContents = await readFile(configPath, 'utf8');
-    const config = yaml.load(fileContents) as { repositories: string[] };
+    const config = yaml.load(fileContents) as { repositories: Repository[] };
     return config.repositories;
   } catch (error) {
     console.error('Error loading repositories config:', error);
@@ -34,29 +40,27 @@ async function generateMarkdownFiles() {
     const repositories = await loadRepositories();
     await mkdir('./resources', { recursive: true });
 
-    for (const repoUrl of repositories) {
-      console.log(`Processing repository: ${repoUrl}`);
+    for (const repo of repositories) {
+      console.log(`Processing repository: ${repo.url}`);
       
       try {
         // Generate markdown content using repomix CLI
-        await execAsync(`repomix --remote ${repoUrl} --ignore "**/*.pbxproj,**/.swiftlint.yml,**/*.license,**/*.xcstrings,**/*.xcworkspace,**/*.xcodeproj,**/*.xcscheme,**/*.xcuserdata,**/*.xcuserdatad,**/*.xcuserstate,**/*.xcuserstate.xcuserdatad" --no-file-summary --compress`);
+        await execAsync(`repomix --remote ${repo.url} --ignore "**/*.pbxproj,**/.swiftlint.yml,**/*.license,**/*.xcstrings,**/*.xcworkspace,**/*.xcodeproj,**/*.xcscheme,**/*.xcuserdata,**/*.xcuserdatad,**/*.xcuserstate,**/*.xcuserstate.xcuserdatad" --no-file-summary --compress`);
         
         // Read the generated output file
         const content = await readFile('repomix-output.txt', 'utf-8');
         
-        // Create a filename from the repository URL
-        const repoName = repoUrl.split('/').pop() || 'repo';
-        const fileName = `${repoName}.md`;
-        const filePath = join('./resources', fileName);
+        // Use the filename from the config
+        const filePath = join('./resources', repo.filename);
         
         // Write the markdown content to a file
         await writeFile(filePath, content, 'utf-8');
-        console.log(`Successfully generated markdown for ${repoUrl} at ${filePath}`);
+        console.log(`Successfully generated markdown for ${repo.url} at ${filePath}`);
 
         // Delete the generated output file
         await unlink('repomix-output.txt');
       } catch (error) {
-        console.error(`Error processing repository ${repoUrl}:`, error);
+        console.error(`Error processing repository ${repo.url}:`, error);
         // Continue with next repository even if one fails
         continue;
       }
@@ -117,11 +121,19 @@ async function processMarkdownFile(filePath: string) {
     // Read the markdown file
     const content = await readFile(filePath, 'utf-8');
 
-    // First create a resource entry for the file
+    // Get the repository URL from repositories.yml based on the filename
+    const repositories = await loadRepositories();
     const fileName = filePath.split('/').pop() || '';
+    const repo = repositories.find(r => r.filename === fileName);
+
+    if (!repo) {
+      console.warn(`Could not find repository URL for ${fileName}`);
+    }
+
+    // First create a resource entry for the file
     const [resource] = await db.insert(resources).values({
-      url: filePath,
-      title: fileName.replace(/\.[^/.]+$/, ''),
+      url: repo?.url || filePath, // Use repo URL if found, fallback to filePath
+      title: repo?.title || fileName.replace(/\.[^/.]+$/, ''), // Use repo title if found, fallback to filename without extension
       content: content
     }).returning();
     
