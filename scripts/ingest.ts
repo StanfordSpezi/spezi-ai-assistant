@@ -106,6 +106,11 @@ async function processMarkdownDirectory(directoryPath: string) {
 }
 
 async function main() {
+  // Clear existing data
+  await db.delete(embeddings);
+  await db.delete(resources);
+
+  // Ingest markdown files
   const markdownDir = './resources';
   await processMarkdownDirectory(markdownDir);
   process.exit(0);
