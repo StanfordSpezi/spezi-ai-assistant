@@ -42,23 +42,29 @@ You will need to update the environment variables [see the example file in `.env
 
 ### Ingesting Documentation
 
-To ingest markdown documentation and code files:
+The system can automatically generate documentation from GitHub repositories and ingest it into the database:
 
-1. Place your markdown files in the `resources` directory
+1. Add the repositories you want to ingest to the `config/repositories.yml` file.
 
-2. Run the ingestion script:
+2. Generate LLM-friendly markdown summaries of the repositories that are saved into the `resources` directory:
+
+   ```bash
+   pnpm generate
+   ```
+
+3. Ingest all markdown files from the `resources` directory into the database:
 
    ```bash
    pnpm ingest
    ```
 
-The script will:
-- Process all markdown and code files
-- Split them into meaningful chunks
-- Generate embeddings using OpenAI's embedding model
-- Store the embeddings in your Postgres database
+4. You can also generate and ingest in one command, if desired:
 
-You can customize the chunk size and overlap in `scripts/ingest-markdown.ts`.
+   ```bash
+   pnpm generate-and-ingest
+   ```
+
+You can customize all of the above in `scripts/ingest.ts`.
 
 ### Install dependencies
 

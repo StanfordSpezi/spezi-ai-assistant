@@ -1,0 +1,28 @@
+repositories:
+  - filename: speziaccount.md
+    url: https://github.com/stanfordspezi/speziaccount
+    title: Spezi Account Module
+  - filename: spezifirebase.md
+    url: https://github.com/stanfordspezi/spezifirebase
+    title: Spezi Firebase Integration
+  - filename: spezionboarding.md
+    url: https://github.com/stanfordspezi/spezionboarding
+    title: Spezi Onboarding Module
+  - filename: spezischeduler.md
+    url: https://github.com/stanfordspezi/spezischeduler
+    title: Spezi Scheduler Module
+  - filename: spezistorage.md
+    url: https://github.com/stanfordspezi/spezistorage
+    title: Spezi Storage Module
+  - filename: speziviews.md
+    url: https://github.com/stanfordspezi/speziviews
+    title: Spezi Views Module
+  - filename: spezillm.md
+    url: https://github.com/stanfordspezi/spezillm
+    title: Spezi LLM Module
+  - filename: spezihealthkit.md
+    url: https://github.com/stanfordspezi/spezihealthkit
+    title: Spezi HealthKit Module
+  - filename: spezitemplateapplication.md
+    url: https://github.com/stanfordspezi/spezitemplateapplication
+    title: Spezi Template Application 
