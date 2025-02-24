@@ -32,6 +32,6 @@ export const findRelevantContent = async (userQuery: string) => {
     .leftJoin(resources, eq(embeddings.resourceId, resources.id))
     .where(gt(similarity, 0.5))
     .orderBy((t: { similarity: ReturnType<typeof sql<number>> }) => desc(t.similarity))
-    .limit(4);
+    .limit(10);
   return similarGuides;
 };
