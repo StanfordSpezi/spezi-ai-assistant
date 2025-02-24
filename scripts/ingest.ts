@@ -10,27 +10,28 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import yaml from 'js-yaml';
+import cliProgress from 'cli-progress';
 
 const execAsync = promisify(exec);
 
 const embeddingModel = openai.embedding('text-embedding-ada-002');
 
-// Array of GitHub repository URLs to process
-const repositories = [
-  'https://github.com/stanfordspezi/speziaccount',
-  'https://github.com/stanfordspezi/spezifirebase',
-  'https://github.com/stanfordspezi/spezionboarding',
-  'https://github.com/stanfordspezi/spezischeduler',
-  'https://github.com/stanfordspezi/spezistorage',
-  'https://github.com/stanfordspezi/speziviews',
-  'https://github.com/stanfordspezi/spezillm',
-  'https://github.com/stanfordspezi/spezihealthkit',
-  'https://github.com/stanfordspezi/spezitemplateapplication'
-];
+async function loadRepositories(): Promise<string[]> {
+  try {
+    const configPath = join(process.cwd(), 'config', 'repositories.yml');
+    const fileContents = await readFile(configPath, 'utf8');
+    const config = yaml.load(fileContents) as { repositories: string[] };
+    return config.repositories;
+  } catch (error) {
+    console.error('Error loading repositories config:', error);
+    process.exit(1);
+  }
+}
 
 async function generateMarkdownFiles() {
   try {
-    // Create resources directory if it doesn't exist
+    const repositories = await loadRepositories();
     await mkdir('./resources', { recursive: true });
 
     for (const repoUrl of repositories) {
@@ -127,14 +128,29 @@ async function processMarkdownFile(filePath: string) {
     // Generate embeddings for the content
     const contentEmbeddings = await generateEmbeddings(content);
     
+    // Create a progress bar
+    const progressBar = new cliProgress.SingleBar({
+      format: 'Processing chunks |{bar}| {percentage}% | {value}/{total} Chunks',
+      barCompleteChar: '\u2588',
+      barIncompleteChar: '\u2591',
+    });
+    
+    // Start the progress bar
+    progressBar.start(contentEmbeddings.length, 0);
+    
     // Store embeddings in the database
-    for (const { embedding, content } of contentEmbeddings) {
+    for (let i = 0; i < contentEmbeddings.length; i++) {
+      const { embedding, content } = contentEmbeddings[i];
       await db.insert(embeddings).values({
         embedding,
         content,
         resourceId: resource.id
       });
+      progressBar.update(i + 1);
     }
+    
+    // Stop the progress bar
+    progressBar.stop();
     console.log(`Successfully processed ${filePath}`);
   } catch (error) {
     console.error(`Error processing ${filePath}:`, error);
