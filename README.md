@@ -42,23 +42,34 @@ You will need to update the environment variables [see the example file in `.env
 
 ### Ingesting Documentation
 
-To ingest markdown documentation and code files:
+The system can automatically generate documentation from GitHub repositories and ingest it into the database. You have three options:
 
-1. Place your markdown files in the `resources` directory
+1. Generate markdown files from Spezi module repositories that are saved into the `resources` directory:
 
-2. Run the ingestion script:
+   ```bash
+   pnpm generate
+   ```
+
+2. Ingest existing markdown files from the `resources` directory:
 
    ```bash
    pnpm ingest
    ```
 
-The script will:
-- Process all markdown and code files
+Note: You can also generate and ingest in one command, if desired:
+
+   ```bash
+   pnpm generate-and-ingest
+   ```
+
+The process will:
+- Generate markdown summaries from Spezi repositories
+- Process all markdown files in the resources directory
 - Split them into meaningful chunks
 - Generate embeddings using OpenAI's embedding model
 - Store the embeddings in your Postgres database
 
-You can customize the chunk size and overlap in `scripts/ingest-markdown.ts`.
+You can customize all of the above in `scripts/ingest.ts`.
 
 ### Install dependencies
 
