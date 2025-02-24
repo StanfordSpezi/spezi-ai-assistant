@@ -42,32 +42,27 @@ You will need to update the environment variables [see the example file in `.env
 
 ### Ingesting Documentation
 
-The system can automatically generate documentation from GitHub repositories and ingest it into the database. You have three options:
+The system can automatically generate documentation from GitHub repositories and ingest it into the database:
 
-1. Generate markdown files from Spezi module repositories that are saved into the `resources` directory:
+1. Add the repositories you want to ingest to the `config/repositories.yml` file.
+
+2. Generate LLM-friendly markdown summaries of the repositories that are saved into the `resources` directory:
 
    ```bash
    pnpm generate
    ```
 
-2. Ingest existing markdown files from the `resources` directory:
+3. Ingest all markdown files from the `resources` directory into the database:
 
    ```bash
    pnpm ingest
    ```
 
-Note: You can also generate and ingest in one command, if desired:
+4. You can also generate and ingest in one command, if desired:
 
    ```bash
    pnpm generate-and-ingest
    ```
-
-The process will:
-- Generate markdown summaries from Spezi repositories
-- Process all markdown files in the resources directory
-- Split them into meaningful chunks
-- Generate embeddings using OpenAI's embedding model
-- Store the embeddings in your Postgres database
 
 You can customize all of the above in `scripts/ingest.ts`.
 
