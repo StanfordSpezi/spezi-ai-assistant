@@ -45,7 +45,7 @@ async function generateMarkdownFiles() {
       
       try {
         // Generate markdown content using repomix CLI
-        await execAsync(`repomix --remote ${repo.url} --ignore "**/*.pbxproj,**/.swiftlint.yml,**/*.license,**/*.xcstrings,**/*.xcworkspace,**/*.xcodeproj,**/*.xcscheme,**/*.xcuserdata,**/*.xcuserdatad,**/*.xcuserstate,**/*.xcuserstate.xcuserdatad" --no-file-summary --compress`);
+        await execAsync(`repomix --remote ${repo.url} --ignore "**/*.pbxproj,**/.swiftlint.yml,**/*.license,**/*.xcstrings,**/*.xcworkspace,**/*.xcodeproj,**/*.xcscheme,**/*.xcuserdata,**/*.xcuserdatad,**/*.xcuserstate,**/*.xcuserstate.xcuserdatad" --no-file-summary`);
         
         // Read the generated output file
         const content = await readFile('repomix-output.txt', 'utf-8');
