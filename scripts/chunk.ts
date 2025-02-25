@@ -1,4 +1,4 @@
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { RecursiveCharacterTextSplitter, MarkdownTextSplitter } from 'langchain/text_splitter';
 import { Document } from 'langchain/document';
 
 /**
@@ -323,29 +323,28 @@ async function chunkMarkdownFile(
   fileHeader: string,
   metadata: Record<string, any>
 ): Promise<Document[]> {
-  // LangChain already provides a markdown-specific splitter
-  const markdownSplitter = new RecursiveCharacterTextSplitter({
+  console.log('\nProcessing Markdown file...');
+  console.log(`Content length: ${content.length}`);
+  
+  // Use LangChain's dedicated markdown splitter
+  const markdownSplitter = new MarkdownTextSplitter({
     chunkSize: 1500,
     chunkOverlap: 200,
-    separators: [
-      // Headers
-      "\n## ", "\n### ", "\n#### ", "\n##### ", "\n###### ",
-      // Block level elements
-      "\n\n", "\n```", "\n---", "\n___", "\n***",
-      // Fallbacks
-      "\n", " ", ""
-    ],
-    keepSeparator: true,
   });
   
-  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
-  const chunks = await markdownSplitter.createDocuments([fileContent]);
+  console.log('Splitting markdown content...');
+  const chunks = await markdownSplitter.createDocuments([content]);
+  
+  console.log(`Generated ${chunks.length} chunks`);
   
   // Add file header to each chunk
-  return chunks.map(chunk => new Document({
-    pageContent: `${fileHeader}${chunk.pageContent}`,
-    metadata
-  }));
+  return chunks.map(chunk => {
+    console.log(`Processing chunk of length: ${chunk.pageContent.length}`);
+    return new Document({
+      pageContent: `${fileHeader}${chunk.pageContent}`,
+      metadata
+    });
+  });
 }
 
 /**
