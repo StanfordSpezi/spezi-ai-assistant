@@ -1,406 +1,419 @@
-export const generateChunks = async (input: string): Promise<string[]> => {
-    console.log('Starting chunk generation...');
-    console.log(`Input length: ${input.length} characters`);
+import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
+import { Document } from 'langchain/document';
 
-    // Split the input into sections based on file boundaries
-    const fileRegex = /^={2,}\nFile: (.+?)\n={2,}\n/gm;
-    const fileSections = [];
-    let lastMatch = null;
-  
-    // First extract the directory structure if present
+/**
+ * Generate chunks from repository content using LangChain splitters
+ * with specific optimizations for Swift code repositories
+ */
+export const generateChunks = async (input: string): Promise<string[]> => {
+    console.log('\n=== Starting Chunk Generation ===');
+    console.log(`Total input length: ${input.length} characters`);
+    console.log('Analyzing input structure...');
+
+    // First identify and separate the directory structure
+    const dirStructureSeparator = "================================================================\nFiles\n================================================================";
+    const dirStructureEndIndex = input.indexOf(dirStructureSeparator);
+    
     let directoryStructure = "";
-    const dirStructureRegex = /^={2,}\nDirectory Structure\n={2,}\n([\s\S]+?)(?=\n={2,}\n|$)/;
-    const dirMatch = input.match(dirStructureRegex);
-    if (dirMatch) {
-      console.log('Found directory structure section');
-      directoryStructure = dirMatch[0];
-      // We'll keep the directory structure as its own chunk for context
-      fileSections.push(directoryStructure);
-    }
-  
-    // Extract file sections, preserving the file headers
-    console.log('Extracting file sections...');
-    let match;
-    let fileCount = 0;
-    while ((match = fileRegex.exec(input)) !== null) {
-      fileCount++;
-      const start = match.index;
-      const filePath = match[1];
-      console.log(`Found file section: ${filePath}`);
-      
-      // If this isn't the first match, calculate the end of the previous section
-      if (lastMatch) {
-        const end = start;
-        const fileContent = input.substring(lastMatch.index, end);
-        fileSections.push(fileContent);
-      }
-      
-      lastMatch = match;
-    }
-    console.log(`Found ${fileCount} file sections`);
+    let fileContent = input;
     
-    // Add the last file section (from the last match to the end)
-    if (lastMatch) {
-      fileSections.push(input.substring(lastMatch.index));
-    } else if (fileSections.length === 0) {
-      console.log('No file sections found, processing entire input as one section');
-      fileSections.push(input);
-    }
-  
-    // Process each file section
-    console.log('Processing file sections into final chunks...');
-    const finalChunks: string[] = [];
-    for (const section of fileSections) {
-      if (section.length <= 1500) {
-        console.log(`Small section (${section.length} chars) kept as single chunk`);
-        finalChunks.push(section);
-        continue;
-      }
-  
-      console.log(`Large section (${section.length} chars) being split...`);
-      const chunks = splitFileContent(section);
-      console.log(`Split into ${chunks.length} chunks`);
-      finalChunks.push(...chunks);
-    }
-  
-    const filteredChunks = finalChunks.filter(chunk => chunk.trim().length > 10);
-    console.log(`Final chunk count: ${filteredChunks.length}`);
-    return filteredChunks;
-  };
-  
-  /**
-   * Split a file content into logical chunks, preserving code structure
-   */
-  const splitFileContent = (fileContent: string): string[] => {
-    console.log('\nSplitting file content...');
-    
-    // Extract the file header for inclusion in each chunk
-    const headerMatch = fileContent.match(/^={2,}\nFile: (.+?)\n={2,}\n/);
-    const fileHeader = headerMatch ? headerMatch[0] : "";
-    const filePath = headerMatch ? headerMatch[1] : "";
-    
-    if (filePath) {
-        console.log(`Processing file: ${filePath}`);
-    }
-    
-    // Remove the header from the content for processing
-    let content = headerMatch 
-      ? fileContent.substring(headerMatch[0].length) 
-      : fileContent;
-    
-    const chunks: string[] = [];
-    
-    // Handle each file type according to its extension
-    if (filePath.endsWith('.swift')) {
-      console.log('Processing as Swift file');
-      chunks.push(...splitSwiftCode(fileHeader, content));
-    } else if (filePath.endsWith('.yml') || filePath.endsWith('.yaml')) {
-      console.log('Processing as YAML file');
-      chunks.push(...splitYamlFile(fileHeader, content));
-    } else if (filePath.endsWith('.md') || filePath.endsWith('.markdown')) {
-      console.log('Processing as Markdown file');
-      chunks.push(...splitMarkdownFile(fileHeader, content));
-    } else if (filePath.endsWith('.json') || filePath.endsWith('.plist')) {
-      console.log('Processing as config file');
-      chunks.push(...splitConfigFile(fileHeader, content));
+    if (dirStructureEndIndex !== -1) {
+        console.log('Found directory structure section');
+        directoryStructure = input.substring(0, dirStructureEndIndex + dirStructureSeparator.length);
+        fileContent = input.substring(dirStructureEndIndex + dirStructureSeparator.length);
+        console.log(`Directory structure length: ${directoryStructure.length}`);
+        console.log(`Remaining content length: ${fileContent.length}`);
     } else {
-      console.log('Processing with default chunking');
-      chunks.push(...splitBySize(fileHeader, content));
+        console.log('No directory structure section found');
+    }
+
+    console.log('\n=== Creating File Documents ===');
+    // Create documents from file sections
+    const fileDocuments = await splitIntoFileDocuments(fileContent);
+    console.log(`Created ${fileDocuments.length} file documents`);
+    
+    // Add directory structure as a separate document if it exists
+    if (directoryStructure) {
+        console.log('Adding directory structure as separate document');
+        fileDocuments.unshift(new Document({
+            pageContent: directoryStructure,
+            metadata: { type: 'directory_structure' }
+        }));
     }
     
-    console.log(`Generated ${chunks.length} chunks for ${filePath || 'content'}`);
-    return chunks;
-  };
-  
-  /**
-   * Split Swift code by declarations (struct, class, extension, function, etc.)
-   */
-  const splitSwiftCode = (fileHeader: string, content: string): string[] => {
-    console.log('\nProcessing Swift code...');
-    const chunks: string[] = [];
-    let currentChunk = "";
+    console.log('\n=== Processing Individual Files ===');
+    // Process each file document
+    const chunkedDocuments: Document[] = [];
+    let processedFiles = 0;
     
-    // Capture imports and header comments first
-    const headerEndRegex = /^(?:\/\/|import\s+|@_)/gm;
-    let lastHeaderMatch = null;
+    for (const doc of fileDocuments) {
+        processedFiles++;
+        console.log(`\nProcessing document ${processedFiles}/${fileDocuments.length}`);
+        console.log(`Document content length: ${doc.pageContent.length}`);
+        
+        const filename = doc.metadata.filename || "unknown";
+        const fileType = detectFileType(filename);
+        console.log(`File: ${filename}`);
+        console.log(`Detected type: ${fileType}`);
+        
+        const chunks = await chunkByFileType(doc.pageContent, fileType, doc.metadata);
+        console.log(`Generated ${chunks.length} chunks for this file`);
+        chunkedDocuments.push(...chunks);
+    }
+    
+    console.log('\n=== Chunk Generation Complete ===');
+    console.log(`Total documents processed: ${fileDocuments.length}`);
+    console.log(`Total chunks generated: ${chunkedDocuments.length}`);
+    
+    // Return the page content of all documents
+    const finalChunks = chunkedDocuments.map(doc => doc.pageContent);
+    console.log(`Final chunk count: ${finalChunks.length}`);
+    console.log('=== End of Chunk Generation ===\n');
+    
+    return finalChunks;
+};
+
+/**
+ * Split repository content into separate file documents
+ */
+async function splitIntoFileDocuments(content: string): Promise<Document[]> {
+    console.log('\n--- Starting File Document Split ---');
+    console.log(`Content length: ${content.length}`);
+    
+    const fileRegex = /^={2,}\nFile: (.+?)\n={2,}\n/gm;
+    const documents: Document[] = [];
+    
     let match;
+    let lastIndex = 0;
+    let fileCount = 0;
     
-    while ((match = headerEndRegex.exec(content)) !== null) {
-        lastHeaderMatch = match;
-    }
+    console.log('Searching for file markers...');
     
-    let headerEnd = 0;
-    if (lastHeaderMatch) {
-        headerEnd = content.indexOf('\n', lastHeaderMatch.index);
-        if (headerEnd === -1) headerEnd = content.length;
-        else headerEnd += 1;
+    while ((match = fileRegex.exec(content)) !== null) {
+        fileCount++;
+        const filename = match[1];
+        const startIndex = match.index;
+        const headerLength = match[0].length;  // Get the full length of the header
         
-        const headerSection = content.substring(0, headerEnd).trim();
-        if (headerSection.length > 0) {
-            console.log('Adding header section');
-            chunks.push(`${fileHeader}// File header\n${headerSection}`);
-        }
-    }
-    
-    // Process declarations
-    const swiftDeclRegex = /^(?:public\s+|private\s+|fileprivate\s+|internal\s+|open\s+)?(?:struct|class|enum|protocol|extension|func|var|let)\s+\w+/gm;
-    let lastIndex = headerEnd;
-    
-    while ((match = swiftDeclRegex.exec(content)) !== null) {
-        console.log(`Found Swift declaration at index ${match.index}`);
-        const start = match.index;
+        console.log(`\nFound file ${fileCount}: ${filename}`);
+        console.log(`File marker at index: ${startIndex}`);
+        console.log(`Header length: ${headerLength}`);
         
-        if (start > lastIndex) {
-            const interstitial = content.substring(lastIndex, start).trim();
-            if (interstitial.length > 0) {
-                if (currentChunk.length + interstitial.length > 1500 && currentChunk.length > 0) {
-                    chunks.push(`${fileHeader}${currentChunk}`);
-                    currentChunk = interstitial + "\n";
-                } else {
-                    currentChunk += (currentChunk ? "\n" : "") + interstitial + "\n";
-                }
-            }
-        }
-        
-        // Find the next declaration to determine the end of this one
-        const nextRegex = new RegExp(swiftDeclRegex);
-        nextRegex.lastIndex = swiftDeclRegex.lastIndex;
-        const nextMatch = nextRegex.exec(content);
-        const end = nextMatch ? nextMatch.index : content.length;
-        
-        const declaration = content.substring(start, end).trim();
-        console.log(`Processing declaration of length ${declaration.length}`);
-        
-        if (currentChunk.length + declaration.length > 1500 && currentChunk.length > 0) {
-            chunks.push(`${fileHeader}${currentChunk}`);
-            currentChunk = declaration;
-        } else {
-            currentChunk += (currentChunk ? "\n" : "") + declaration;
-        }
-        
-        lastIndex = end;
-    }
-    
-    if (currentChunk.length > 0) {
-        chunks.push(`${fileHeader}${currentChunk}`);
-    }
-    
-    console.log(`Swift processing complete. Generated ${chunks.length} chunks`);
-    return chunks;
-  };
-  
-  /**
-   * Split YAML files while preserving section structure
-   */
-  const splitYamlFile = (fileHeader: string, content: string): string[] => {
-    console.log('\nProcessing YAML file...');
-    
-    if (content.length <= 1500) {
-        console.log('Content small enough for single chunk');
-        return [`${fileHeader}${content}`];
-    }
-    
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = content.split('\n');
-    let currentIndent = 0;
-    
-    console.log(`Processing ${lines.length} lines`);
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const indent = line.search(/\S/);
-        
-        // New top-level section
-        if (indent === 0 && line.trim().length > 0) {
-            console.log(`Found top-level section: ${line.trim()}`);
+        // If this isn't the first match, extract the previous file
+        if (startIndex > lastIndex) {
+            const fileContent = content.substring(lastIndex, startIndex);
+            console.log(`Extracting content of length: ${fileContent.length}`);
             
-            if (currentChunk.length > 0) {
-                chunks.push(`${fileHeader}${currentChunk}`);
-                currentChunk = "";
-            }
-            currentIndent = 0;
-        }
-        
-        if (currentChunk.length + line.length + 1 > 1500 && currentChunk.length > 0) {
-            console.log('Creating new chunk due to size limit');
-            chunks.push(`${fileHeader}${currentChunk}`);
-            currentChunk = line;
-        } else {
-            currentChunk += (currentChunk ? "\n" : "") + line;
-        }
-    }
-    
-    if (currentChunk.length > 0) {
-        chunks.push(`${fileHeader}${currentChunk}`);
-    }
-    
-    console.log(`YAML processing complete. Generated ${chunks.length} chunks`);
-    return chunks;
-  };
-  
-  /**
-   * Split Markdown files by headers
-   */
-  const splitMarkdownFile = (fileHeader: string, content: string): string[] => {
-    console.log('\nProcessing Markdown file...');
-    
-    if (content.length <= 1500) {
-        console.log('Content small enough for single chunk');
-        return [`${fileHeader}${content}`];
-    }
-    
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = content.split('\n');
-    
-    console.log(`Processing ${lines.length} lines`);
-    
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        
-        // New section if we find a header
-        if (line.startsWith('#')) {
-            console.log(`Found header: ${line.trim()}`);
-            
-            if (currentChunk.length > 0) {
-                chunks.push(`${fileHeader}${currentChunk}`);
-                currentChunk = "";
-            }
-        }
-        
-        if (currentChunk.length + line.length + 1 > 1500 && currentChunk.length > 0) {
-            console.log('Creating new chunk due to size limit');
-            chunks.push(`${fileHeader}${currentChunk}`);
-            currentChunk = line;
-        } else {
-            currentChunk += (currentChunk ? "\n" : "") + line;
-        }
-    }
-    
-    if (currentChunk.length > 0) {
-        chunks.push(`${fileHeader}${currentChunk}`);
-    }
-    
-    console.log(`Markdown processing complete. Generated ${chunks.length} chunks`);
-    return chunks;
-  };
-  
-  /**
-   * Split configuration files like JSON and plist
-   */
-  const splitConfigFile = (fileHeader: string, content: string): string[] => {
-    console.log('\nProcessing config file...');
-    
-    if (content.length <= 1500) {
-        console.log('Content small enough for single chunk');
-        return [`${fileHeader}${content}`];
-    }
-    
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = content.split('\n');
-    
-    console.log(`Processing ${lines.length} lines`);
-    
-    for (const line of lines) {
-        if (currentChunk.length + line.length + 1 > 1500 && currentChunk.length > 0) {
-            // Don't split in the middle of a JSON object/array
-            const balanced = isBalanced(currentChunk);
-            if (balanced) {
-                console.log('Creating new chunk due to size limit');
-                chunks.push(`${fileHeader}${currentChunk}`);
-                currentChunk = line;
+            if (fileContent.trim().length > 0) {  // Only add if there's actual content
+                documents.push(new Document({
+                    pageContent: fileContent,
+                    metadata: { 
+                        filename: filename,
+                        type: 'file' 
+                    }
+                }));
+                console.log(`Added document for: ${filename}`);
             } else {
-                currentChunk += '\n' + line;
+                console.log('Skipping empty content');
             }
+        }
+        
+        lastIndex = startIndex + headerLength;  // Advance past the header
+        console.log(`New lastIndex: ${lastIndex}`);
+    }
+    
+    // Add the last file
+    if (lastIndex < content.length) {
+        const fileContent = content.substring(lastIndex);
+        console.log('\nProcessing final file section');
+        console.log(`Remaining content length: ${fileContent.length}`);
+        
+        // Extract filename from the last file header
+        const filenameMatch = fileContent.match(/^={2,}\nFile: (.+?)\n={2,}\n/);
+        const filename = filenameMatch ? filenameMatch[1] : "unknown";
+        
+        if (fileContent.trim().length > 0) {  // Only add if there's actual content
+            documents.push(new Document({
+                pageContent: fileContent,
+                metadata: { 
+                    filename: filename,
+                    type: 'file' 
+                }
+            }));
+            console.log(`Added final document for: ${filename}`);
         } else {
-            currentChunk += (currentChunk ? "\n" : "") + line;
+            console.log('Skipping empty final content');
         }
     }
     
-    if (currentChunk.length > 0) {
-        chunks.push(`${fileHeader}${currentChunk}`);
-    }
+    console.log('\n--- File Document Split Complete ---');
+    console.log(`Total documents created: ${documents.length}`);
     
-    console.log(`Config processing complete. Generated ${chunks.length} chunks`);
-    return chunks;
-  };
+    return documents;
+}
+
+/**
+ * Detect the type of file based on extension
+ */
+function detectFileType(filename: string): string {
+  if (filename.endsWith('.swift')) {
+    return 'swift';
+  } else if (filename.endsWith('.yml') || filename.endsWith('.yaml')) {
+    return 'yaml';
+  } else if (filename.endsWith('.md') || filename.endsWith('.markdown')) {
+    return 'markdown';
+  } else if (filename.endsWith('.json')) {
+    return 'json';
+  } else if (filename.endsWith('.plist')) {
+    return 'plist';
+  } else {
+    return 'unknown';
+  }
+}
+
+/**
+ * Apply different chunking strategies based on file type
+ */
+async function chunkByFileType(
+  content: string, 
+  fileType: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  // Keep track of file header to include with each chunk
+  const headerMatch = content.match(/^={2,}\nFile: (.+?)\n={2,}\n/);
+  const fileHeader = headerMatch ? headerMatch[0] : "";
   
-  /**
-   * Check if a JSON-like string has balanced braces and brackets
-   */
-  const isBalanced = (content: string): boolean => {
-    const stack = [];
-    let inString = false;
-    let escape = false;
-    
-    for (let i = 0; i < content.length; i++) {
-      const char = content[i];
-      
-      if (escape) {
-        escape = false;
-        continue;
-      }
-      
-      if (char === '\\') {
-        escape = true;
-        continue;
-      }
-      
-      if (char === '"' && !inString) {
-        inString = true;
-      } else if (char === '"' && inString) {
-        inString = false;
-      } else if (!inString) {
-        if (char === '{' || char === '[') {
-          stack.push(char);
-        } else if (char === '}') {
-          if (stack.length === 0 || stack.pop() !== '{') {
-            return false;
-          }
-        } else if (char === ']') {
-          if (stack.length === 0 || stack.pop() !== '[') {
-            return false;
-          }
-        }
-      }
-    }
-    
-    return stack.length === 0;
-  };
+  let documents: Document[] = [];
   
-  /**
-   * Default chunking by size while trying to preserve line boundaries
-   */
-  const splitBySize = (fileHeader: string, content: string): string[] => {
-    console.log('\nProcessing with default chunking...');
-    
-    if (content.length <= 1500) {
-        console.log('Content small enough for single chunk');
-        return [`${fileHeader}${content}`];
+  switch (fileType) {
+    case 'swift':
+      documents = await chunkSwiftCode(content, fileHeader, metadata);
+      break;
+    case 'yaml':
+      documents = await chunkYamlFile(content, fileHeader, metadata);
+      break;
+    case 'markdown':
+      documents = await chunkMarkdownFile(content, fileHeader, metadata);
+      break;
+    case 'json':
+    case 'plist':
+      documents = await chunkConfigFile(content, fileHeader, metadata);
+      break;
+    default:
+      documents = await chunkGenericFile(content, fileHeader, metadata);
+      break;
+  }
+  
+  return documents;
+}
+
+/**
+ * Chunk Swift code files using specialized Swift-aware separators
+ */
+async function chunkSwiftCode(
+  content: string, 
+  fileHeader: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  // Extract the content without the header
+  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
+  
+  // Create Swift-specific splitter
+  const swiftSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1500,
+    chunkOverlap: 200,
+    separators: [
+      // First try to split on Swift declarations
+      "\n\nclass ", "\n\nstruct ", "\n\nenum ", "\n\nprotocol ", 
+      "\n\nextension ", "\n\nfunc ", "\n\nvar ", "\n\nlet ",
+      // Then try Swift visibility modifiers
+      "\n\npublic ", "\n\nprivate ", "\n\ninternal ", "\n\nfileprivate ", "\n\nopen ",
+      // Next try comments and general Swift constructs
+      "\n\n//", "\n\n/*", "\n\nimport ", "\n\n@",
+      // Fall back to normal paragraph and sentence splitting
+      "\n\n", "\n", ". ", "? ", "! ",
+      // Last resort
+      " ", ""
+    ],
+    keepSeparator: true,
+  });
+  
+  // First extract the imports and header comments
+  const importsEndRegex = /^(?:import|\/\/|\/\*|@).*?$/m;
+  const match = fileContent.match(importsEndRegex);
+  
+  let headerSection = "";
+  let codeSection = fileContent;
+  
+  if (match) {
+    const headerEndIndex = fileContent.indexOf('\n\n', match.index);
+    if (headerEndIndex !== -1) {
+      headerSection = fileContent.substring(0, headerEndIndex);
+      codeSection = fileContent.substring(headerEndIndex);
     }
-    
-    const chunks: string[] = [];
-    let currentChunk = "";
-    const lines = content.split('\n');
-    
-    console.log(`Processing ${lines.length} lines`);
-    
-    for (const line of lines) {
-        if (currentChunk.length + line.length + 1 > 1500 && currentChunk.length > 0) {
-            console.log('Creating new chunk due to size limit');
-            chunks.push(`${fileHeader}${currentChunk}`);
-            currentChunk = line;
-        } else {
-            currentChunk += (currentChunk ? "\n" : "") + line;
-        }
-    }
-    
-    if (currentChunk.length > 0) {
-        chunks.push(`${fileHeader}${currentChunk}`);
-    }
-    
-    console.log(`Default chunking complete. Generated ${chunks.length} chunks`);
-    return chunks;
-  };
+  }
+  
+  const documents: Document[] = [];
+  
+  // Add header section as its own chunk if it exists
+  if (headerSection) {
+    documents.push(new Document({
+      pageContent: `${fileHeader}${headerSection}`,
+      metadata: {
+        ...metadata,
+        section: 'header'
+      }
+    }));
+  }
+  
+  // Chunk the main code section
+  const chunks = await swiftSplitter.createDocuments([codeSection]);
+  
+  // Add file header to each chunk and update metadata
+  return [
+    ...documents,
+    ...chunks.map(chunk => new Document({
+      pageContent: `${fileHeader}${chunk.pageContent}`,
+      metadata: {
+        ...metadata,
+        section: 'code'
+      }
+    }))
+  ];
+}
+
+/**
+ * Chunk YAML files by maintaining top-level structures
+ */
+async function chunkYamlFile(
+  content: string, 
+  fileHeader: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  // Extract content without header
+  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
+  
+  // Create YAML-aware splitter
+  const yamlSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1500,
+    chunkOverlap: 200,
+    separators: [
+      // Try to split on top-level YAML keys
+      "\n\n", "\n- ", "\n  - ", 
+      // Last resort
+      "\n", " ", ""
+    ],
+    keepSeparator: true,
+  });
+  
+  const chunks = await yamlSplitter.createDocuments([fileContent]);
+  
+  // Add file header to each chunk
+  return chunks.map(chunk => new Document({
+    pageContent: `${fileHeader}${chunk.pageContent}`,
+    metadata
+  }));
+}
+
+/**
+ * Chunk Markdown files by headings
+ */
+async function chunkMarkdownFile(
+  content: string, 
+  fileHeader: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  // LangChain already provides a markdown-specific splitter
+  const markdownSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1500,
+    chunkOverlap: 200,
+    separators: [
+      // Headers
+      "\n## ", "\n### ", "\n#### ", "\n##### ", "\n###### ",
+      // Block level elements
+      "\n\n", "\n```", "\n---", "\n___", "\n***",
+      // Fallbacks
+      "\n", " ", ""
+    ],
+    keepSeparator: true,
+  });
+  
+  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
+  const chunks = await markdownSplitter.createDocuments([fileContent]);
+  
+  // Add file header to each chunk
+  return chunks.map(chunk => new Document({
+    pageContent: `${fileHeader}${chunk.pageContent}`,
+    metadata
+  }));
+}
+
+/**
+ * Chunk configuration files like JSON and plist
+ */
+async function chunkConfigFile(
+  content: string, 
+  fileHeader: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  // For config files, we need to be careful about breaking JSON structure
+  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
+  
+  // If the file is small enough, keep it as a single chunk
+  if (fileContent.length <= 1500) {
+    return [new Document({
+      pageContent: content,
+      metadata
+    })];
+  }
+  
+  // Create a splitter with conservative chunk size
+  const configSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 300,
+    separators: [
+      // Try to split on structural elements
+      "\n  },\n", "\n  ],\n", "\n},\n", "\n],\n",
+      // More aggressive splits
+      "\n  },", "\n  ],", "\n},", "\n],",
+      // Last resort
+      "\n", " ", ""
+    ],
+    keepSeparator: true,
+  });
+  
+  const chunks = await configSplitter.createDocuments([fileContent]);
+  
+  // Add file header to each chunk
+  return chunks.map(chunk => new Document({
+    pageContent: `${fileHeader}${chunk.pageContent}`,
+    metadata
+  }));
+}
+
+/**
+ * Default chunking for unknown file types
+ */
+async function chunkGenericFile(
+  content: string, 
+  fileHeader: string,
+  metadata: Record<string, any>
+): Promise<Document[]> {
+  const fileContent = fileHeader ? content.substring(fileHeader.length) : content;
+  
+  // Use standard text splitter with reasonable defaults
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1500,
+    chunkOverlap: 200,
+    separators: ["\n\n", "\n", ". ", " ", ""],
+    keepSeparator: true,
+  });
+  
+  const chunks = await splitter.createDocuments([fileContent]);
+  
+  // Add file header to each chunk
+  return chunks.map(chunk => new Document({
+    pageContent: `${fileHeader}${chunk.pageContent}`,
+    metadata
+  }));
+}
