@@ -16,9 +16,9 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'How do I configure my development environment',
-      label: 'for the Spezi Template Application?',
-      action: 'How do I configure my development environment for the Spezi Template Application?',
+      title: 'How do I set up my Mac for development',
+      label: 'with Spezi?',
+      action: 'How do I set up my Mac for development with Spezi?',
     },
     {
       title: 'How do I collect data from HealthKit',

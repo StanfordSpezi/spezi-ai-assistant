@@ -95,8 +95,7 @@ export async function POST(request: Request) {
               query: z.string().describe('the search query or question to look up'),
             }),
             execute: async ({ query }) => {
-              const results = await findRelevantContent(query);
-              return results.map(result => result.content);
+              return await findRelevantContent(query);
             }
           }),
         },

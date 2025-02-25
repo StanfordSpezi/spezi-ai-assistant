@@ -166,8 +166,19 @@ const PurePreviewMessage = ({
                             result={result}
                             isReadonly={isReadonly}
                           />
+                        ) : toolName === 'getKnowledgeBase' ? (
+                          <div className="text-sm text-muted-foreground">
+                            <h3 className="font-bold">Sources:</h3>
+                            <ul className="list-disc pl-4 mt-1">
+                              {(Array.from(new Set(result.map((r: any) => r.url))) as string[]).map(
+                                (url) => (
+                                  <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></li>
+                                )
+                              )}
+                            </ul>
+                          </div>
                         ) : (
-                          null
+                          <pre>{JSON.stringify(result, null, 2)}</pre>
                         )}
                       </div>
                     );
