@@ -83,17 +83,17 @@ async function splitIntoFileDocuments(content: string): Promise<Document[]> {
     const fileRegex = /^={2,}\nFile: (.+?)\n={2,}\n/gm;
     const documents: Document[] = [];
     
-    let match;
+    let match: RegExpExecArray | null = null;
     let lastIndex = 0;
     let fileCount = 0;
     
     console.log('Searching for file markers...');
-    
-    while ((match = fileRegex.exec(content)) !== null) {
+    match = fileRegex.exec(content);
+    while (match !== null) {
         fileCount++;
         const filename = match[1];
         const startIndex = match.index;
-        const headerLength = match[0].length;  // Get the full length of the header
+        const headerLength = match[0].length;
         
         console.log(`\nFound file ${fileCount}: ${filename}`);
         console.log(`File marker at index: ${startIndex}`);
@@ -104,7 +104,7 @@ async function splitIntoFileDocuments(content: string): Promise<Document[]> {
             const fileContent = content.substring(lastIndex, startIndex);
             console.log(`Extracting content of length: ${fileContent.length}`);
             
-            if (fileContent.trim().length > 0) {  // Only add if there's actual content
+            if (fileContent.trim().length > 0) {
                 documents.push(new Document({
                     pageContent: fileContent,
                     metadata: { 
@@ -118,8 +118,11 @@ async function splitIntoFileDocuments(content: string): Promise<Document[]> {
             }
         }
         
-        lastIndex = startIndex + headerLength;  // Advance past the header
+        lastIndex = startIndex + headerLength;
         console.log(`New lastIndex: ${lastIndex}`);
+        
+        // Get next match
+        match = fileRegex.exec(content);
     }
     
     // Add the last file
@@ -132,7 +135,7 @@ async function splitIntoFileDocuments(content: string): Promise<Document[]> {
         const filenameMatch = fileContent.match(/^={2,}\nFile: (.+?)\n={2,}\n/);
         const filename = filenameMatch ? filenameMatch[1] : "unknown";
         
-        if (fileContent.trim().length > 0) {  // Only add if there's actual content
+        if (fileContent.trim().length > 0) {
             documents.push(new Document({
                 pageContent: fileContent,
                 metadata: { 
