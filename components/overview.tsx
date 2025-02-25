@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-
-import { MessageIcon } from './icons';
+import Image from 'next/image';
 
 export const Overview = () => {
   return (
@@ -15,7 +14,7 @@ export const Overview = () => {
     >
       <div className="rounded-xl p-6 flex flex-col gap-8 leading-relaxed text-center max-w-xl">
         <p className="flex flex-row justify-center gap-4 items-center">
-          <MessageIcon size={32} />
+          <Image src="/images/spaceman.png" alt="Spaceman" width={100} height={100} />
         </p>
         <p>
           This is an AI assistant designed to help you build digital health applications with the{' '}

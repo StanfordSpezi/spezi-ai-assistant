@@ -16,24 +16,24 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'What are the advantages',
-      label: 'of using Stanford Spezi?',
-      action: 'What are the advantages of using Stanford Spezi?',
+      title: 'How do I configure my development environment',
+      label: 'for the Spezi Template Application?',
+      action: 'How do I configure my development environment for the Spezi Template Application?',
     },
     {
-      title: 'How do I collect data',
-      label: `from Apple HealthKit using Spezi?`,
-      action: `How do I collect data from Apple HealthKit using Stanford Spezi?`,
+      title: 'How do I collect data from HealthKit',
+      label: `in the background in my Spezi application?`,
+      action: `How do I collect data from HealthKit using Spezi?`,
     },
     {
-      title: 'How do I use an on-device LLM',
-      label: `with Stanford Spezi?`,
-      action: `How do I use an on-device LLM with Stanford Spezi?`,
+      title: 'How do I schedule a questionnaire',
+      label: `in my Spezi application?`,
+      action: `How do I schedule a questionnaire in my Spezi application?`,
     },
     {
-      title: 'How do I configure my Mac',
-      label: 'to develop with Stanford Spezi?',
-      action: 'How do I configure my Mac to develop with Stanford Spezi?',
+      title: 'How do I customize the onboarding process',
+      label: 'in my Spezi application?',
+      action: 'How do I customize the onboarding process in my Spezi application?',
     },
   ];
 
