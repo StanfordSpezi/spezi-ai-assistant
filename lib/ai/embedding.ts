@@ -26,6 +26,7 @@ export const findRelevantContent = async (userQuery: string) => {
   const similarGuides = await db
     .select({ 
       content: embeddings.content, 
+      url: resources.url,
       similarity
     })
     .from(embeddings)
