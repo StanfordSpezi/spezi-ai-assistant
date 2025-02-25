@@ -1,28 +1,43 @@
 repositories:
-  - filename: speziaccount.md
+  - title: Spezi Account
     url: https://github.com/stanfordspezi/speziaccount
-    title: Spezi Account Module
-  - filename: spezifirebase.md
+    filename: speziaccount.md
+  - title: Spezi Chat
+    url: https://github.com/stanfordspezi/spezichat
+    filename: spezichat.md
+  - title: Spezi Contact
+    url: https://github.com/stanfordspezi/spezicontact
+    filename: spezicontact.md
+  - title: Spezi Firebase
     url: https://github.com/stanfordspezi/spezifirebase
-    title: Spezi Firebase Integration
-  - filename: spezionboarding.md
+    filename: spezifirebase.md
+  - title: Spezi Onboarding
     url: https://github.com/stanfordspezi/spezionboarding
-    title: Spezi Onboarding Module
-  - filename: spezischeduler.md
+    filename: spezionboarding.md
+  - title: Spezi Scheduler
     url: https://github.com/stanfordspezi/spezischeduler
-    title: Spezi Scheduler Module
-  - filename: spezistorage.md
+    filename: spezischeduler.md
+  - title: Spezi Storage
     url: https://github.com/stanfordspezi/spezistorage
-    title: Spezi Storage Module
-  - filename: speziviews.md
+    filename: spezistorage.md
+  - title: Spezi Views
     url: https://github.com/stanfordspezi/speziviews
-    title: Spezi Views Module
-  - filename: spezillm.md
+    filename: speziviews.md
+  - title: Spezi Access Guard
+    url: https://github.com/stanfordspezi/speziaccessguard
+    filename: speziaccessguard.md
+  - title: Spezi Notifications
+    url: https://github.com/stanfordspezi/spezinotifications
+    filename: spezinotifications.md
+  - title: Spezi LLM
     url: https://github.com/stanfordspezi/spezillm
-    title: Spezi LLM Module
-  - filename: spezihealthkit.md
+    filename: spezillm.md
+  - title: Spezi HealthKit
     url: https://github.com/stanfordspezi/spezihealthkit
-    title: Spezi HealthKit Module
-  - filename: spezitemplateapplication.md
+    filename: spezihealthkit.md
+  - title: Spezi Medication
+    url: https://github.com/stanfordspezi/spezimedication
+    filename: spezimedication.md
+  - title: Spezi Template Application
     url: https://github.com/stanfordspezi/spezitemplateapplication
-    title: Spezi Template Application 
+    filename: spezitemplateapplication.md 

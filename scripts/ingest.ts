@@ -4,7 +4,6 @@ import { openai } from '@ai-sdk/openai';
 import { db } from '../lib/db';
 import { embeddings, resources } from '../lib/db/schema';
 import { embedMany } from 'ai';
-import { MarkdownTextSplitter, RecursiveCharacterTextSplitter } from 'langchain/text_splitter';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -12,6 +11,7 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import yaml from 'js-yaml';
 import cliProgress from 'cli-progress';
+import { generateChunks } from './chunk';
 
 const execAsync = promisify(exec);
 
@@ -73,45 +73,23 @@ async function generateMarkdownFiles() {
   }
 }
 
-const generateChunks = async (input: string): Promise<string[]> => {
-  // Create a markdown splitter that preserves code blocks and headers
-  const markdownSplitter = new MarkdownTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 200,
-  });
-
-  // Create a code splitter for handling large code blocks
-  const codeSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1000,
-    chunkOverlap: 200,
-    separators: ["\n\n", "\n", " ", ""],
-    keepSeparator: true,
-  });
-
-  // First split by markdown structure
-  const mdDocs = await markdownSplitter.splitText(input);
-
-  // Further process any large chunks (especially code blocks)
-  const finalChunks: string[] = [];
-  for (const doc of mdDocs) {
-    if (doc.length > 1500) { // If chunk is too large
-      finalChunks.push(...await codeSplitter.splitText(doc));
-    } else {
-      finalChunks.push(doc);
-    }
-  }
-
-  return finalChunks.filter(chunk => chunk.length > 10);
-};
-
 const generateEmbeddings = async (
   value: string,
 ): Promise<Array<{ embedding: number[]; content: string }>> => {
+  console.log('\nGenerating embeddings...');
+  console.log(`Input content length: ${value.length} characters`);
+  
+  console.log('Generating chunks...');
   const chunks = await generateChunks(value);
+  console.log(`Generated ${chunks.length} chunks`);
+  
+  console.log('Creating embeddings...');
   const { embeddings } = await embedMany({
     model: embeddingModel,
     values: chunks,
   });
+  console.log(`Created ${embeddings.length} embeddings`);
+  
   return embeddings.map((e, i) => ({ content: chunks[i], embedding: e }));
 };
 
